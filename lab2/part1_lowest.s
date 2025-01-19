@@ -37,6 +37,8 @@ iloop: j iloop
 .data
 
 result: .word 0
-n:	.word 7
-numbers: .word 4,5,3,6
-	.word 1, 8, 2
+n:	.word 15
+numbers: .word 999, 256, 2, 64
+	.word 1023, 5, 900, 128
+	.word 1, 42, 800, 512
+	.word 3, 10, 700

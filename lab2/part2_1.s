@@ -30,13 +30,13 @@ loop:
 
 finished1:
 	la s3, result
-	sw t2, (s1)
+	sw t2, (s3)
 	j iloop
 	
 finished2:
 	la s3, result
 	li t2, -1
-	sw t2, (s1)
+	sw t2, (s3)
 
 iloop: j iloop
 

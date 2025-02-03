@@ -65,7 +65,7 @@ WAIT:
 	li s0, 0x8 
 	sw s0, TIMER0_CONTROL(t2)
 	
-	#set the period registers to 100M
+	#set the period registers to 1M
 	.equ TICKSPERSEC, 1000000
 	.equ TICKSPERSECHIGH, (TICKSPERSEC >> 16) #%hi
 	.equ TICKSPERSECLOW, (TICKSPERSEC & 0x0000FFFF) #%low

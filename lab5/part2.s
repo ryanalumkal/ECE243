@@ -74,68 +74,68 @@ interrupt_handler:
 mret
 
 KEY_ISR:   
-addi sp, sp,-24
-sw ra, 0(sp)
-sw a0, 4(sp)
-sw a1, 8(sp)
-sw a3, 12(sp)
-sw t5, 16(sp)
-sw t6, 20(sp)
+	addi sp, sp,-24
+	sw ra, 0(sp)
+	sw a0, 4(sp)
+	sw a1, 8(sp)
+	sw a3, 12(sp)
+	sw t5, 16(sp)
+	sw t6, 20(sp)
 
 
 
 
-li a4, 0xff200050   # Reload pushbutton base address
-lw a3, 12(a4) 
-li t6, 0xF
-sw t6, 12(a4) #clear edge capture register
+	li a4, 0xff200050   # Reload pushbutton base address
+	lw a3, 12(a4) 
+	li t6, 0xF
+	sw t6, 12(a4) #clear edge capture register
 
-andi t5, a3, 1
-li a0,0
-li a1, 0
-bne t5, x0, toggle
+	andi t5, a3, 1
+	li a0,0
+	li a1, 0
+	bne t5, x0, toggle
 
-andi t5, a3, 2
-li a0,1
-li a1, 1
+	andi t5, a3, 2
+	li a0,1
+	li a1, 1
 
-bne t5, x0, toggle
+	bne t5, x0, toggle
 
-andi t5, a3, 4
-li a0,2
-li a1, 2
-bne t5, x0, toggle
+	andi t5, a3, 4
+	li a0,2
+	li a1, 2
+	bne t5, x0, toggle
 
-andi t5, a3, 8
-li a0,3
-li a1, 3
-bne t5, x0, toggle
-#Your KEY_ISR code here
-here:
-lw ra, 0(sp)
-lw a0, 4(sp)
-lw a1, 8(sp)
-lw a3, 12(sp)
-lw t5, 16(sp)
-lw t6, 20(sp)
+	andi t5, a3, 8
+	li a0,3
+	li a1, 3
+	bne t5, x0, toggle
+	#Your KEY_ISR code here
+	here:
+	lw ra, 0(sp)
+	lw a0, 4(sp)
+	lw a1, 8(sp)
+	lw a3, 12(sp)
+	lw t5, 16(sp)
+	lw t6, 20(sp)
 
-addi sp, sp, 24
-ret
+	addi sp, sp, 24
+	ret
 
-toggle:
-	xor t0,t0,t5
-	and t6, t0, t5
-	beq t6, x0, call_blank
-	j call_hex_disp
-	
-call_blank:
-	li a0, 0b1000
-	call HEX_DISP
-	j here
-	
-call_hex_disp:
-	call HEX_DISP
-	j here
+	toggle:
+		xor t0,t0,t5
+		and t6, t0, t5
+		beq t6, x0, call_blank
+		j call_hex_disp
+
+	call_blank:
+		li a0, 0xFF
+		call HEX_DISP
+		j here
+
+	call_hex_disp:
+		call HEX_DISP
+		j here
 
 
 .equ HEX_BASE1, 0xff200020

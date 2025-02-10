@@ -1,205 +1,285 @@
 .global _start
 _start:
 
+	.equ LEDs,  0xFF200000
+	.equ TIMER, 0xFF202000
+	.equ BUTTONs, 0xFF200050
 
-.equ HEX_BASE1, 0xff200020
-.equ HEX_BASE2, 0xff200030
-
-.equ PUSH_BUTTON, 0xFF200050
-
-#Your code goes below here:
-
-#Your code should:
-
-#Turn off interrupts in case an interrupt is called before correct set up
- 	csrw mstatus, zero
+	#Set up the stack pointer
+	li sp, 0x20000
 	
-#Initialize the stack pointer
-	li sp, 0x200000
+	jal    CONFIG_TIMER        # configure the Timer
+    jal    CONFIG_KEYS         # configure the KEYs port
+	
+	/*Enable Interrupts in the NIOS V processor, and set up the address handling
+	location to be the interrupt_handler subroutine*/
+	
+	la s0, LEDs
+	la s1, COUNT
+	
+	LOOP:
+		lw     s2, 0(s1)          # Get current count
+		sw     s2, 0(s0)          # Store count in LEDs
+	j      LOOP
 
-#activate interrupts from IRQ18 (Pushbuttons)
-	li    a2, 0x40000
-	csrrs x0, mie, a2
-	
-#Set the mtvec register to be the interrupt_handler location
-	la a2, interrupt_handler
-	csrrw x0, mtvec, a2
-	
-/*Allow interrupts on the pushbutton's interrupt mask register, and any 
-#additional set up for the pushbuttons */
-	li a4, 0xff200050 # buttons
-	li a2, 0xF        # first make sure the EDGE register is all clear
-	sw a2, 12(a4)     # reset EDGE bits
-	li a2, 0xF       # set MASK bit 0 to 1, enable int requests for button 0
-	sw a2, 8(a4)
-	li t5, 0
-	li t1, 1
-	li t2, 2
-	li t3, 3
-	li t0, 0
-	
-		
- 
-#Now that everything is set, turn on Interrupts in the mstatus register
-	li  a2, 0x8
-	csrrs x0, mstatus, a2
-	
-IDLE: j IDLE #Infinite loop while waiting on interrupt
 
 interrupt_handler:
+
 	addi sp, sp, -12
-	
-	sw s0, 0(sp)
-	sw s1, 4(sp)
+	sw t0, (sp)
+	sw t1, 4(sp)
 	sw ra, 8(sp)
 	
-	li s0, 0x40000 #Checking if Interrupt comes from IRQ 18
-	csrr s1, mcause
+	#mcause tells what caused the interrupt (exactly what IRQ line)
+	li t0, 0x7FFFFFFF
+	csrr t1, mcause #encodes the IRQ Line # that caused the interrupt
+	and t1, t1, t0 #zero bit 31 (not needed)
 	
-	and s1, s1, s0
-	bnez s1, end_interrupt
-	
-	jal KEY_ISR # If so call KEY_ISR
-	
+	li t0, 18 #for KEY
+	bne t1, t0, JUMP_KEY
+	call KEY_ISR
+	j end_interrupt
+
+	JUMP_KEY: #jumps here if interrupt was not KEY
+		li t0, 16 #for TIMER
+		bne t1, t0, end_interrupt
+		call TIMER_ISR
+
 	end_interrupt:
 
-	
-	lw s0, 0(sp)
-	lw s1, 4(sp)
-	lw ra, 8(sp)
-	
-	addi sp, sp, 12
-	
+		lw t0, (sp)
+		lw t1, 4(sp)
+		lw ra, 8(sp)
+		addi sp, sp, 12
 
 mret
 
-KEY_ISR:   
-	addi sp, sp,-24
-	sw ra, 0(sp)
-	sw a0, 4(sp)
-	sw a1, 8(sp)
-	sw a3, 12(sp)
-	sw t5, 16(sp)
-	sw t6, 20(sp)
+KEY_ISR:
 
-
-
-
-	li a4, 0xff200050   # Reload pushbutton base address
-	lw a3, 12(a4) 
-	li t6, 0xF
-	sw t6, 12(a4) #clear edge capture register
-
-	andi t5, a3, 1
-	li a0,0
-	li a1, 0
-	bne t5, x0, toggle
-
-	andi t5, a3, 2
-	li a0,1
-	li a1, 1
-
-	bne t5, x0, toggle
-
-	andi t5, a3, 4
-	li a0,2
-	li a1, 2
-	bne t5, x0, toggle
-
-	andi t5, a3, 8
-	li a0,3
-	li a1, 3
-	bne t5, x0, toggle
-	#Your KEY_ISR code here
-	here:
-		lw ra, 0(sp)
-		lw a0, 4(sp)
-		lw a1, 8(sp)
-		lw a3, 12(sp)
-		lw t5, 16(sp)
-		lw t6, 20(sp)
-
-		addi sp, sp, 24
-		ret
-
-	toggle:
-		xor t0,t0,t5
-		and t6, t0, t5
-		beq t6, x0, call_blank
-		j call_hex_disp
+	.equ TIMER0_STATUS, 0
+	.equ TIMER0_CONTROL, 4
+	.equ TIMER0_PERIODL, 8
+	.equ TIMER0_PERIODH, 12
 	
-call_blank:
-	li a0, 0xFF
-	call HEX_DISP
-	j here
+	#set the period registers to 25M, for 0.25 seconds
+	.equ TICKSPERSEC, 25000000 
+
+	addi sp, sp, -24
+	sw t0, (sp)
+	sw t1, 4(sp)
+	sw t2, 8(sp)
+	sw t3, 12(sp)
+	sw t4, 16(sp)
+	sw s0, 20(sp)
 	
-call_hex_disp:
-	call HEX_DISP
-	j here
-
-
-.equ HEX_BASE1, 0xff200020
-.equ HEX_BASE2, 0xff200030
-
-li sp, 0x20000
-
-#Your code Here:
-
-iloop: j iloop
-
-#Subroutine is here:
-
-HEX_DISP:   
-		addi sp, sp, -16
-		sw s0,0(sp)
-		sw s1,0x4(sp)
-		sw s2,0x8(sp)
-		sw s3,0xC(sp)
+	#code
 	
-		la   s0, BIT_CODES         # starting address of the bit codes
-	    andi     s1, a0, 0x10	       # get bit 4 of the input into r6
-	    beq      s1, zero, not_blank 
-	    mv      s2, zero
-	    j       DO_DISP
-not_blank:  andi     a0, a0, 0x0f	   # r4 is only 4-bit
-            add      a0, a0, s0        # add the offset to the bit codes
-            lb      s2, 0(a0)         # index into the bit codes
+	la t0, BUTTONs
+	lw t1, 12(t0)
+	
+	li t2, 1
+	li t3, 2
+	li t4, 4
+	
+	beq t1, t2, key_0
+	beq t1, t3, key_1 #button 1
+	beq t1, t4, key_2 
+	
+	
+	la t0, RUN
+	lw t1, (t0)
+	
+	li s0, TICKSPERSEC
+	
+	key_0: 
+	la t0, RUN
+	lw t1, (t0)
+	xori t1, t1, 1
+	sw t1, 0(t0)
+	j done2
+	
+	key_1:
+	li t0, 1000000
+	beq t0, s0, done2
+	srli s0, s0, 1
+	
+	j reset_timer
+	
+	key_2:
+	li t0, 100000000
+	beq t0, t1, done2
+	slli s0, s0, 1
+	
+	j reset_timer
+	
+	reset_timer:
+		#STOP TIMER
+		la t2, TIMER #address of timer
+		li t1, 0b1011
+		sw t1, 4(t2)
+	j done
+	
 
-#Display it on the target HEX display
-DO_DISP:    
-			la       s0, HEX_BASE1         # load address
-			li       s1,  4
-			blt      a1,s1, FIRST_SET      # hex4 and hex 5 are on 0xff200030
-			sub      a1, a1, s1            # if hex4 or hex5, we need to adjust the shift
-			addi     s0, s0, 0x0010        # we also need to adjust the address
-FIRST_SET:
-			slli     a1, a1, 3             # hex*8 shift is needed
-			addi     s3, zero, 0xff        # create bit mask so other values are not corrupted
-			sll      s3, s3, a1 
-			li     	 a0, -1
-			xor      s3, s3, a0  
-    		sll      a0, s2, a1            # shift the hex code we want to write
-			lw    	 a1, 0(s0)             # read current value       
-			and      a1, a1, s3            # and it with the mask to clear the target hex
-			or       a1, a1, a0	           # or with the hex code
-			sw    	 a1, 0(s0)		       # store back
-END:			
-			mv 		 a0, s2				   # put bit pattern on return register
-			
-			
-			lw s0,0(sp)
-			lw s1,0x4(sp)
-			lw s2,0x8(sp)
-			lw s3,0xC(sp)
-			addi sp, sp, 16
-			ret
+done:
+	la t2, TIMER #address of timer
+	#AFTER ALL IS DONE
+	.equ TICKSPERSECHIGH, (TICKSPERSEC >> 16) #%hi
+	.equ TICKSPERSECLOW, (TICKSPERSEC & 0x0000FFFF) #%low
+	li s0, TICKSPERSECLOW
+	sw s0, TIMER0_PERIODL(t2)
+	li s0, TICKSPERSECHIGH
+	sw s0, TIMER0_PERIODH(t2)
+	
+	
+	la t2, TIMER #address of timer
+	li t1, 0x5
+	sw t1, 4(t2)
+	
+done2:	
 
+	la t0, BUTTONs
+	li t1, 0xF
+	sw t1, 12(t0)
+	
+	
+	lw t0, (sp)
+	lw t1, 4(sp)
+	lw t2, 8(sp)
+	lw t3, 12(sp)
+	lw t4, 16(sp)
+	lw s0, 20(sp)
+	addi sp, sp, 24
+	ret
+
+	
+TIMER_ISR:
+
+	addi sp, sp, -12
+	sw t0, (sp)
+	sw t1, 4(sp)
+	sw t2, 8(sp)
+	
+	#code
+	la t0, COUNT
+	lw t1, (t0)
+	
+	la t0, RUN
+	lw t2, (t0)
+	
+	li t0, 255
+	bne t1, t0, skip
+	
+	li t1,0
+	j skip2
+
+
+	skip:
+	add t1, t1, t2 #COUNT += RUN (0 or 1)
+
+	skip2:
+	la t0, COUNT
+	sw t1, (t0)
+	
+	la t0, TIMER
+	li t1, 2
+	sw t1, (t0) #reset TO
+	
+	lw t0, (sp)
+	lw t1, 4(sp)
+	lw t2, 8(sp)
+	addi sp, sp, 12
+	ret
+
+
+CONFIG_TIMER: 
+	
+	#Code not shown
+	
+	addi sp, sp, -16
+	sw t0, (sp)
+	sw t1, 4(sp)
+	sw t2, 8(sp)
+	sw s0, 12(sp)
+	
+	.equ TIMER0_STATUS, 0
+	.equ TIMER0_CONTROL, 4
+	.equ TIMER0_PERIODL, 8
+	.equ TIMER0_PERIODH, 12
+	
+	la t2, TIMER
+	li s0, 0x8 
+	sw s0, TIMER0_CONTROL(t2)
+	
+	#set the period registers to 25M, for 0.25 seconds
+	.equ TICKSPERSEC, 25000000 
+	.equ TICKSPERSECHIGH, (TICKSPERSEC >> 16) #%hi
+	.equ TICKSPERSECLOW, (TICKSPERSEC & 0x0000FFFF) #%low
+	li s0, TICKSPERSECLOW
+	sw s0, TIMER0_PERIODL(t2)
+	li s0, TICKSPERSECHIGH
+	sw s0, TIMER0_PERIODH(t2)
+	
+	li s0, 0x6
+	sw s0, TIMER0_CONTROL(t2)
+	
+	#SET ITO to 1
+	li s0, 3
+	sw s0, TIMER0_CONTROL(t2)
+	
+	li t0, 0x10000
+	
+	csrs mie, t0  #enables IRQ 16
+	
+	lw t0, (sp)
+	lw t1, 4(sp)
+	lw t2, 8(sp)
+	lw s0, 12(sp)
+	addi sp, sp, 16
+	
+ret
+
+CONFIG_KEYS: #CHECK
+
+	#Code not shown
+	
+	addi sp, sp, -12
+	sw t0, (sp)
+	sw t1, 4(sp)
+	sw ra, 8(sp)
+	
+	
+	la t1, BUTTONs
+	li t0, 0b0111 #enable all buttons
+	
+	sw t0, 8(t1) 
+	
+	sw t0, 12(t1)
+	
+	li t0, 0x40000
+	 
+	csrs mie, t0 #tells processor to listen to bit 18 for interrupts (i.e. the button)
+	
+	la t0, interrupt_handler    # put the address of interrupt handler routine into t0
+
+	csrw mtvec, t0 			# set MTVEC to contain that address - so proc knows where to go when interrupted 
+
+	li t0, 0b1000			# turn on bit three of register t0
+
+	csrs mstatus, t0      # use it to turn on bit 3 of MSTATUS - the MIE bit to enable processor interrupts
+
+	lw t0, (sp)
+	lw t1, 4(sp)
+	lw ra, 8(sp)
+	addi sp, sp, 12
+
+ret
 
 .data
-BIT_CODES:  .byte     0b00111111, 0b00000110, 0b01011011, 0b01001111
-			.byte     0b01100110, 0b01101101, 0b01111101, 0b00000111
-			.byte     0b01111111, 0b01100111, 0b01110111, 0b01111100
-			.byte     0b00111001, 0b01011110, 0b01111001, 0b01110001
+/* Global variables */
+.global  COUNT
+COUNT:  .word    0x0            # used by timer
 
-            .end
-			
+.global  RUN                    # used by pushbutton KEYs
+RUN:    .word    0x1            # initial value to increment COUNT
+
+.end

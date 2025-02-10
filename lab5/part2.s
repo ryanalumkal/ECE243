@@ -12,65 +12,38 @@ _start:
 #Your code should:
 
 #Turn off interrupts in case an interrupt is called before correct set up
-
+ 	csrw mstatus, zero
+	
 #Initialize the stack pointer
+	li sp, 0x200000
 
 #activate interrupts from IRQ18 (Pushbuttons)
-
+	li    a2, 0x40000
+	csrrs x0, mie, a2
+	
 #Set the mtvec register to be the interrupt_handler location
-
+	la a2, interrupt_handler
+	csrrw x0, mtvec, a2
+	
 /*Allow interrupts on the pushbutton's interrupt mask register, and any 
 #additional set up for the pushbuttons */
-
+	li a4, 0xff200050 # buttons
+	li a2, 0xF        # first make sure the EDGE register is all clear
+	sw a2, 12(a4)     # reset EDGE bits
+	li a2, 0xF       # set MASK bit 0 to 1, enable int requests for button 0
+	sw a2, 8(a4)
+	li t5, 0
+	li t1, 1
+	li t2, 2
+	li t3, 3
+	li t0, 0
+	
+		
+ 
 #Now that everything is set, turn on Interrupts in the mstatus register
-
-csrw mstatus, zero #disable procesor level interrupts
-
-li sp, 0x20000 #stack
-
-#RESET DISPLAYS
-li a0, 0xFF
-li a1, 0
-call HEX_DISP
-li a0, 0xFF
-li a1, 1
-call HEX_DISP
-li a0, 0xFF
-li a1, 2
-call HEX_DISP
-li a0, 0xFF
-li a1, 3
-call HEX_DISP
-li a0, 0xFF
-li a1, 4
-call HEX_DISP
-li a0, 0xFF
-li a1, 5
-
-la t1, PUSH_BUTTON			# address of KEY registers base into t1
-li t0, 0b1111		   # enable all buttons
-
-sw t0, 8(t1) 			# Set interrupt enable - I.e. have it request an interrupt
-
-sw t0, 12(t1) 			# This will clear Edge Capture bit of Keys
-
-# Now, enable interrupts from the processor side (it won't respond to a request until enabled in 2 ways:
-
-li t0, 0x40000 			# 0x40000 corresponds to bit 18 of 32 bit word being 1 
-									# (The Keys request interrupts on line 18)
-
-csrs mie, t0 			# this sets bit 18 of the MIE to 1, enabling interrupts specifically 
-									# from the KEYs, and no other device
-
-la t0, interrupt_handler    # put the address of interrupt handler routine into t0
-
-csrw mtvec, t0 			# set MTVEC to contain that address - so proc knows where to go when interrupted 
-
-li t0, 0b1000			# turn on bit three of register t0
-
-csrs mstatus, t0      # use it to turn on bit 3 of MSTATUS - the MIE bit to enable processor interrupts
-
-
+	li  a2, 0x8
+	csrrs x0, mstatus, a2
+	
 IDLE: j IDLE #Infinite loop while waiting on interrupt
 
 interrupt_handler:
@@ -96,88 +69,79 @@ interrupt_handler:
 	lw ra, 8(sp)
 	
 	addi sp, sp, 12
+	
 
 mret
 
-KEY_ISR: 
-		
-	li s7, 0
-	li s10, 0
-	addi sp, sp, -4
-	
-	sw ra, 0(sp)
-	
-	addi sp, sp, -20
-	sw t0, 0(sp)
-	sw t1, 4(sp)
-	sw t2, 8(sp)
-	sw a0, 12(sp)
-	sw a1, 16(sp)
-		
-	#Your KEY_ISR code here
-	
-	la t0, PUSH_BUTTON
-	
-	lw t1, 12(t0) #load edge-capture register
-	
+KEY_ISR:   
+addi sp, sp,-24
+sw ra, 0(sp)
+sw a0, 4(sp)
+sw a1, 8(sp)
+sw a3, 12(sp)
+sw t5, 16(sp)
+sw t6, 20(sp)
 
-	#CHECK WHAT BUTTON IS PRESSED
-	andi t2, t1, 1 #checks 0 bit
-	li s8, 0
-	li s9, 0
-	bne t2, x0, CALL_DISP
-	
-	andi t2, t1, 2 #checks 1 bit
-	li s8, 1
-	li s9, 1
-	bne t2, x0, CALL_DISP
-	
-	andi t2, t1, 4 #checks 2 bit
-	li s8, 2
-	li s9, 2
-	bne t2, x0, CALL_DISP
-	
-	andi t2, t1, 8 #checks 3 bit
-	li s8, 3
-	li s9, 3
-	bne t2, x0, CALL_DISP
 
-	CALL_DISP:
-		
-		mv a0, s8
-		mv a1, s9
-		
-		sw t1, 12(t0) #reset edge
-		
-		li s8, 0
-		li s9, 0
-		call HEX_DISP
-	
-	
-	lw t0, 0(sp)
-	lw t1, 4(sp)
-	lw t2, 8(sp)
-	lw a0, 12(sp)
-	lw a1, 16(sp)
-	
-	addi sp, sp, 20
-	
-	lw ra, 0(sp)
-	addi sp, sp, 4
-	
+
+
+li a4, 0xff200050   # Reload pushbutton base address
+lw a3, 12(a4) 
+li t6, 0xF
+sw t6, 12(a4) #clear edge capture register
+
+andi t5, a3, 1
+li a0,0
+li a1, 0
+bne t5, x0, toggle
+
+andi t5, a3, 2
+li a0,1
+li a1, 1
+
+bne t5, x0, toggle
+
+andi t5, a3, 4
+li a0,2
+li a1, 2
+bne t5, x0, toggle
+
+andi t5, a3, 8
+li a0,3
+li a1, 3
+bne t5, x0, toggle
+#Your KEY_ISR code here
+here:
+lw ra, 0(sp)
+lw a0, 4(sp)
+lw a1, 8(sp)
+lw a3, 12(sp)
+lw t5, 16(sp)
+lw t6, 20(sp)
+
+addi sp, sp, 24
 ret
 
-/*    Subroutine to display a four-bit quantity as a hex digits (from 0 to F) 
-      on one of the six HEX 7-segment displays on the DE1_SoC.
-*
- *    Parameters: the low-order 4 bits of register a0 contain the digit to be displayed
-		  if bit 4 of a1 is a one, then the display should be blanked
- *    		  the low order 3 bits of a0 say which HEX display number 0-5 to put the digit on
- *    Returns: a0 = bit patterm that is written to HEX display
- */
+toggle:
+	xor t0,t0,t5
+	and t6, t0, t5
+	beq t6, x0, call_blank
+	j call_hex_disp
+	
+call_blank:
+	li a0, 0b1000
+	call HEX_DISP
+	j here
+	
+call_hex_disp:
+	call HEX_DISP
+	j here
+
 
 .equ HEX_BASE1, 0xff200020
 .equ HEX_BASE2, 0xff200030
+
+li sp, 0x20000
 
 #Your code Here:
 

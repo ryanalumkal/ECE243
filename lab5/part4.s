@@ -63,6 +63,8 @@ KEY_ISR:
 	
 	#set the period registers to 25M, for 0.25 seconds
 	.equ TICKSPERSEC, 25000000 
+	.equ MIN_TICKS, 100000    # Minimum timer period (avoid zero)
+	.equ MAX_TICKS, 100000000  # Maximum timer period
 
 	addi sp, sp, -24
 	sw t0, (sp)
@@ -72,8 +74,7 @@ KEY_ISR:
 	sw t4, 16(sp)
 	sw s0, 20(sp)
 	
-	#code
-	
+	# Read the button values
 	la t0, BUTTONs
 	lw t1, 12(t0)
 	
@@ -84,63 +85,63 @@ KEY_ISR:
 	beq t1, t2, key_0
 	beq t1, t3, key_1 #button 1
 	beq t1, t4, key_2 
-	
-	
-	la t0, RUN
-	lw t1, (t0)
-	
-	li s0, TICKSPERSEC
+	j done
 	
 	key_0: 
 	la t0, RUN
 	lw t1, (t0)
 	xori t1, t1, 1
 	sw t1, 0(t0)
-	j done2
-	
-	key_1:
-	li t0, 1000000
-	beq t0, s0, done2
-	srli s0, s0, 1
-	
-	j reset_timer
-	
-	key_2:
-	li t0, 100000000
-	beq t0, t1, done2
-	slli s0, s0, 1
-	
-	j reset_timer
-	
-	reset_timer:
-		#STOP TIMER
-		la t2, TIMER #address of timer
-		li t1, 0b1011
-		sw t1, 4(t2)
 	j done
 	
-
-done:
-	la t2, TIMER #address of timer
-	#AFTER ALL IS DONE
-	.equ TICKSPERSECHIGH, (TICKSPERSEC >> 16) #%hi
-	.equ TICKSPERSECLOW, (TICKSPERSEC & 0x0000FFFF) #%low
-	li s0, TICKSPERSECLOW
-	sw s0, TIMER0_PERIODL(t2)
-	li s0, TICKSPERSECHIGH
-	sw s0, TIMER0_PERIODH(t2)
+	key_1:
+	# Double the speed (halve the timer period)
+	la t0, TIMER
+	lw t1, TIMER0_PERIODL(t0)
+	lw t2, TIMER0_PERIODH(t0)
+	slli t4, t2, 16
+	add t4, t4, t1
+	srli t4, t4, 1
+	li t3, MIN_TICKS          # Load MIN_TICKS into t3
+	bgeu t4, t3, update_timer # If t1 >= MIN_TICKS, proceed
+	li t4, MIN_TICKS          # Otherwise, set t1 to MIN_TICKS
+	j update_timer
 	
+	key_2:
+	# Halve the speed (double the timer period)
+	la t0, TIMER
+	lw t1, TIMER0_PERIODL(t0)
+	lw t2, TIMER0_PERIODH(t0)
+	slli t4, t2, 16
+	add t4, t4, t1
+	slli t4,t4, 1
+	li t3, MAX_TICKS          # Load MAX_TICKS into t3
+	bleu t4, t3, update_timer # If t1 <= MAX_TICKS, proceed
+	li t4, MAX_TICKS          # Otherwise, set t1 to MAX_TICKS
+	j update_timer
 	
-	la t2, TIMER #address of timer
-	li t1, 0x5
-	sw t1, 4(t2)
+	update_timer:
+	# Stop the timer
+	li t3, 0b1011
+	sw t3, TIMER0_CONTROL(t0)
 	
-done2:	
-
+	# Update the timer period
+	srli t2, t4, 16 
+	
+	srli t1, t4, 16
+	srli t1, t1, 16
+	sw t1, TIMER0_PERIODL(t0)
+	sw t2, TIMER0_PERIODH(t0)
+	
+	# Restart the timer
+	li t3, 0b0111
+	sw t3, TIMER0_CONTROL(t0)
+	
+done:	
+	# Clear the edge capture register
 	la t0, BUTTONs
 	li t1, 0xF
 	sw t1, 12(t0)
-	
 	
 	lw t0, (sp)
 	lw t1, 4(sp)
@@ -150,7 +151,6 @@ done2:
 	lw s0, 20(sp)
 	addi sp, sp, 24
 	ret
-
 	
 TIMER_ISR:
 

@@ -27,8 +27,8 @@ int main(void) {
 			int left = audiop->ldata; 
 			int right = audiop->rdata;
 
-			int left_output = left + (int)(DAMPING * left_delay[DELAY_SAMPLES-sample]); //wait 3200 samples/4sec?
-			int right_output = right + (int)(DAMPING * right_delay[DELAY_SAMPLES-sample]);
+			int left_output = left + (int)(DAMPING * left_delay[sample]); //wait 3200 samples/4sec?
+			int right_output = right + (int)(DAMPING * right_delay[sample]);
 
 			while (audiop->wsrc == 0){
 			}

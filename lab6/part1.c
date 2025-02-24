@@ -11,7 +11,7 @@ struct BUTTON{
 struct BUTTON *const keys_ptr = (struct BUTTON*)KEYs;
 volatile int *leds_ptr = (int*) LEDs;
 
-void loop(void){
+int main(void){
 	*leds_ptr = 0;
 
 	while(1){
@@ -21,12 +21,8 @@ void loop(void){
 		}
 		if (keys_ptr->ED & 0x2){
 			*leds_ptr = 0x0;
-			keys_ptr->ED = 1;
+			keys_ptr->ED = 3;
 		}
 	}
-}
-
-int main(void){
-	loop();
 	return 0;
 }

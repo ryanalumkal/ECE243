@@ -84,6 +84,14 @@ void draw(int num_boxes, int x_box[], int y_box[], int color_box[]){
 	
 	for (int i = 0; i < num_boxes; i++){
 		draw_line(x_box[i], y_box[i], x_box[i], y_box[i], color_box[i]);
+		draw_line(x_box[i]+1, y_box[i], x_box[i]+1, y_box[i], color_box[i]);
+		draw_line(x_box[i]-1, y_box[i], x_box[i]-1, y_box[i], color_box[i]);
+		draw_line(x_box[i], y_box[i]+1, x_box[i], y_box[i]+1, color_box[i]);
+		draw_line(x_box[i], y_box[i]-1, x_box[i], y_box[i]-1, color_box[i]);
+		draw_line(x_box[i]+1, y_box[i]+1, x_box[i]+1, y_box[i]+1, color_box[i]);
+		draw_line(x_box[i]+1, y_box[i]-1, x_box[i]+1, y_box[i]-1, color_box[i]);
+		draw_line(x_box[i]-1, y_box[i]-1, x_box[i]-1, y_box[i]-1, color_box[i]);
+		draw_line(x_box[i]-1, y_box[i]+1, x_box[i]-1, y_box[i]+1, color_box[i]);
 		draw_line(x_box[i], y_box[i], x_box[(i+1)%(num_boxes)], y_box[(i+1)%(num_boxes)], color_box[i]);
 	}
 }
@@ -172,5 +180,4 @@ int main(void)
         pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
     }
 }
-
 
